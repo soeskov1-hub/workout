@@ -93,6 +93,7 @@ export default function Dashboard() {
         .map((te, index) => ({
           workout_id: workout.id,
           name: te.name,
+          exercise_catalog_id: te.exercise_catalog_id,
           order_index: index,
         }))
 
@@ -126,6 +127,33 @@ export default function Dashboard() {
       navigate(`/workout/${workout.id}`)
     } catch (error) {
       console.error('Error creating workout:', error)
+      toast.error('Kunne ikke oprette workout')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleStartQuickWorkout = async () => {
+    setLoading(true)
+    try {
+      // Create empty workout without template
+      const { data: workout, error: workoutError } = await supabase
+        .from('workouts')
+        .insert({
+          date: selectedDate,
+          template_id: null,
+          name_override: 'Quick Workout',
+          completed: false,
+        })
+        .select()
+        .single()
+
+      if (workoutError) throw workoutError
+
+      toast.success('Tom workout oprettet!')
+      navigate(`/workout/${workout.id}`)
+    } catch (error) {
+      console.error('Error creating quick workout:', error)
       toast.error('Kunne ikke oprette workout')
     } finally {
       setLoading(false)
@@ -181,13 +209,23 @@ export default function Dashboard() {
             </select>
           </div>
 
-          <button
-            onClick={handleStartWorkout}
-            disabled={loading || !selectedTemplateId}
-            className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Opretter...' : '🚀 Start Workout'}
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={handleStartWorkout}
+              disabled={loading || !selectedTemplateId}
+              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Opretter...' : '🚀 Fra Template'}
+            </button>
+            
+            <button
+              onClick={handleStartQuickWorkout}
+              disabled={loading}
+              className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Opretter...' : '⚡ Tom Workout'}
+            </button>
+          </div>
         </div>
       </div>
 

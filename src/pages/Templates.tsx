@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { TemplateWithExercises, TemplateExercise } from '../types/database'
 import { toast } from 'sonner'
+import ExerciseSelector from '../components/ExerciseSelector'
+
+const untypedSupabase = supabase as any
 
 export default function Templates() {
   const [templates, setTemplates] = useState<TemplateWithExercises[]>([])
@@ -9,7 +12,8 @@ export default function Templates() {
   const [editingTemplate, setEditingTemplate] = useState<TemplateWithExercises | null>(null)
   const [templateName, setTemplateName] = useState('')
   const [exercises, setExercises] = useState<Array<{
-    name: string
+    exercise_catalog_id: string | null
+    name: string | null
     default_sets: number
     default_reps: number
   }>>([])
@@ -38,6 +42,7 @@ export default function Templates() {
       setEditingTemplate(template)
       setTemplateName(template.name)
       setExercises(template.template_exercises.map(ex => ({
+        exercise_catalog_id: ex.exercise_catalog_id,
         name: ex.name,
         default_sets: ex.default_sets || 3,
         default_reps: ex.default_reps || 10,
@@ -45,7 +50,7 @@ export default function Templates() {
     } else {
       setEditingTemplate(null)
       setTemplateName('')
-      setExercises([{ name: '', default_sets: 3, default_reps: 10 }])
+      setExercises([{ exercise_catalog_id: null, name: null, default_sets: 3, default_reps: 10 }])
     }
     setShowModal(true)
   }
@@ -58,7 +63,7 @@ export default function Templates() {
   }
 
   const addExercise = () => {
-    setExercises([...exercises, { name: '', default_sets: 3, default_reps: 10 }])
+    setExercises([...exercises, { exercise_catalog_id: null, name: null, default_sets: 3, default_reps: 10 }])
   }
 
   const removeExercise = (index: number) => {
@@ -70,6 +75,12 @@ export default function Templates() {
     updated[index] = { ...updated[index], [field]: value }
     setExercises(updated)
   }
+  
+  const updateExerciseFromSelector = (index: number, exerciseId: string, exerciseName: string) => {
+    const updated = [...exercises]
+    updated[index] = { ...updated[index], exercise_catalog_id: exerciseId, name: exerciseName }
+    setExercises(updated)
+  }
 
   const saveTemplate = async () => {
     if (!templateName.trim()) {
@@ -77,15 +88,15 @@ export default function Templates() {
       return
     }
 
-    if (exercises.length === 0 || exercises.some(ex => !ex.name.trim())) {
-      toast.error('Alle øvelser skal have et navn')
+    if (exercises.length === 0 || exercises.some(ex => !ex.exercise_catalog_id && !ex.name)) {
+      toast.error('Alle øvelser skal vælges')
       return
     }
 
     try {
       if (editingTemplate) {
         // Update existing template
-        const { error: templateError } = await supabase
+        const { error: templateError } = await untypedSupabase
           .from('templates')
           .update({ name: templateName })
           .eq('id', editingTemplate.id)
@@ -93,7 +104,7 @@ export default function Templates() {
         if (templateError) throw templateError
 
         // Delete old exercises
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await untypedSupabase
           .from('template_exercises')
           .delete()
           .eq('template_id', editingTemplate.id)
@@ -101,10 +112,11 @@ export default function Templates() {
         if (deleteError) throw deleteError
 
         // Insert new exercises
-        const { error: exercisesError } = await supabase
+        const { error: exercisesError } = await untypedSupabase
           .from('template_exercises')
           .insert(exercises.map((ex, index) => ({
             template_id: editingTemplate.id,
+            exercise_catalog_id: ex.exercise_catalog_id,
             name: ex.name,
             default_sets: ex.default_sets,
             default_reps: ex.default_reps,
@@ -116,7 +128,7 @@ export default function Templates() {
         toast.success('Template opdateret!')
       } else {
         // Create new template
-        const { data: template, error: templateError } = await supabase
+        const { data: template, error: templateError } = await untypedSupabase
           .from('templates')
           .insert({ name: templateName })
           .select()
@@ -124,10 +136,11 @@ export default function Templates() {
 
         if (templateError) throw templateError
 
-        const { error: exercisesError } = await supabase
+        const { error: exercisesError } = await untypedSupabase
           .from('template_exercises')
           .insert(exercises.map((ex, index) => ({
             template_id: template.id,
+            exercise_catalog_id: ex.exercise_catalog_id,
             name: ex.name,
             default_sets: ex.default_sets,
             default_reps: ex.default_reps,
@@ -153,12 +166,29 @@ export default function Templates() {
     }
 
     try {
-      const { error } = await supabase
+      // First, set template_id to null for any workouts using this template
+      const { error: workoutsError } = await supabase
+        .from('workouts')
+        .update({ template_id: null })
+        .eq('template_id', id)
+
+      if (workoutsError) throw workoutsError
+
+      // Then delete all template_exercises for this template
+      const { error: exercisesError } = await untypedSupabase
+        .from('template_exercises')
+        .delete()
+        .eq('template_id', id)
+
+      if (exercisesError) throw exercisesError
+
+      // Finally delete the template itself
+      const { error: templateError } = await supabase
         .from('templates')
         .delete()
         .eq('id', id)
 
-      if (error) throw error
+      if (templateError) throw templateError
 
       toast.success('Template slettet!')
       loadTemplates()
@@ -263,11 +293,10 @@ export default function Templates() {
                     {exercises.map((exercise, index) => (
                       <div key={index} className="flex gap-2 items-start">
                         <div className="flex-1">
-                          <input
-                            type="text"
-                            value={exercise.name}
-                            onChange={(e) => updateExercise(index, 'name', e.target.value)}
-                            placeholder="Øvelse navn"
+                          <ExerciseSelector
+                            value={exercise.exercise_catalog_id}
+                            onChange={(id, name) => updateExerciseFromSelector(index, id, name)}
+                            placeholder="Vælg øvelse..."
                             className="input"
                           />
                         </div>
