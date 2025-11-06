@@ -15,7 +15,15 @@ export default function Layout() {
       <header className="bg-primary-600 dark:bg-primary-700 text-white shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">💪 Workout Tracker</h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-2xl font-bold">💪 Workout Tracker</h1>
+              <Link 
+                to="/exercises" 
+                className="text-sm px-3 py-1 bg-primary-500 dark:bg-primary-600 hover:bg-primary-400 dark:hover:bg-primary-500 rounded-lg transition-colors"
+              >
+                📚 Øvelser
+              </Link>
+            </div>
             <button
               onClick={toggleTheme}
               className="p-2 rounded-lg hover:bg-primary-700 dark:hover:bg-primary-600 transition-colors"
@@ -57,6 +65,17 @@ export default function Layout() {
             >
               <span className="text-2xl mb-1">📋</span>
               <span className="text-xs font-medium">Templates</span>
+            </Link>
+            <Link
+              to="/1rm"
+              className={`flex-1 flex flex-col items-center py-3 transition-colors ${
+                isActive('/1rm') 
+                  ? 'text-primary-600 dark:text-primary-400' 
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              <span className="text-2xl mb-1">💪</span>
+              <span className="text-xs font-medium">1RM</span>
             </Link>
             <Link
               to="/history"

@@ -138,12 +138,41 @@ export default function History() {
     }
 
     try {
-      const { error } = await supabase
+      // First, get all exercises for this workout
+      const { data: exercises, error: exercisesQueryError } = await supabase
+        .from('exercises')
+        .select('id')
+        .eq('workout_id', workoutId)
+
+      if (exercisesQueryError) throw exercisesQueryError
+
+      // Delete all sets for these exercises
+      if (exercises && exercises.length > 0) {
+        const exerciseIds = exercises.map(ex => ex.id)
+        
+        const { error: setsError } = await supabase
+          .from('sets')
+          .delete()
+          .in('exercise_id', exerciseIds)
+
+        if (setsError) throw setsError
+      }
+
+      // Then delete all exercises
+      const { error: exercisesError } = await supabase
+        .from('exercises')
+        .delete()
+        .eq('workout_id', workoutId)
+
+      if (exercisesError) throw exercisesError
+
+      // Finally delete the workout itself
+      const { error: workoutError } = await supabase
         .from('workouts')
         .delete()
         .eq('id', workoutId)
 
-      if (error) throw error
+      if (workoutError) throw workoutError
 
       toast.success('Workout slettet')
       loadWorkouts()
@@ -253,6 +282,12 @@ export default function History() {
           className={viewMode === 'calendar' ? 'btn-primary' : 'btn-secondary'}
         >
           📅 Kalender
+        </button>
+        <button
+          onClick={() => navigate('/volume')}
+          className="btn-secondary ml-auto"
+        >
+          📊 Ugentlig Status
         </button>
       </div>
 
